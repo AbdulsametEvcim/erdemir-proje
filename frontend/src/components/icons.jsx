@@ -37,6 +37,32 @@ export function LogoutIcon(props) {
   )
 }
 
+export function LeafIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M11 20A7 7 0 0 1 4 13c0-4 3-9 11-9 1 4-1 9-4 12-1 1-2 2-2 4Z" />
+      <path d="M4 13c3 0 6-1 8-3" />
+    </svg>
+  )
+}
+
+export function SunIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  )
+}
+
+export function MoonIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" />
+    </svg>
+  )
+}
+
 export function BoxIcon(props) {
   return (
     <svg {...base} {...props}>

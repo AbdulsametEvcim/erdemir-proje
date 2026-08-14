@@ -37,6 +37,26 @@
   }
 }
 
+:root[data-theme="dark"] {
+  --text: #d4d4d8;
+  --text-h: #f4f4f5;
+  --bg: #101114;
+  --bg-card: #1a1b1f;
+  --border-color: #2c2d33;
+  --danger-bg: #2a1414;
+  --success-bg: #10221a;
+}
+
+:root[data-theme="light"] {
+  --text: #3f3f46;
+  --text-h: #18181b;
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --border-color: #e4e4e7;
+  --danger-bg: #fef2f2;
+  --success-bg: #f0fdf4;
+}
+
 * { box-sizing: border-box; }
 
 body { margin: 0; }
@@ -69,12 +89,71 @@ input, select {
 
 /* Login */
 .login-page {
-  min-height: 100svh;
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.login-bg-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.login-bg-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(8,12,22,0.72);
+}
+
+.login-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.login-brand { display: none; color: #fff; max-width: 420px; }
+.login-illustration-logo {
+  width: 68px;
+  height: 44px;
+  background: #fff;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 6px 8px;
+  margin-bottom: 20px;
 }
+.login-illustration-logo img { width: 100%; height: 100%; object-fit: contain; }
+.login-brand h2 { color: #fff; font-size: 26px; margin-bottom: 10px; }
+.login-brand p { color: rgba(255,255,255,0.75); font-size: 14px; line-height: 1.5; }
+
+@media (min-width: 900px) {
+  .login-content {
+    flex-direction: row;
+    justify-content: space-between;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 60px;
+  }
+  .login-brand { display: block; }
+  .login-bg-overlay {
+    background: linear-gradient(90deg, rgba(8,12,22,0.15) 0%, rgba(8,12,22,0.55) 55%, rgba(8,12,22,0.88) 100%);
+  }
+}
+
 .login-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -87,7 +166,7 @@ input, select {
   gap: 6px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.06);
 }
-.login-card h1 { font-size: 20px; text-align: center; margin-bottom: 2px; }
+.login-card h1 { font-size: 22px; text-align: center; margin-bottom: 2px; }
 .login-subtitle { text-align: center; color: var(--text); font-size: 13px; margin-bottom: 20px; }
 .login-card label { font-size: 13px; margin-top: 10px; margin-bottom: 4px; }
 .login-card button { margin-top: 20px; }
@@ -103,6 +182,7 @@ input, select {
   border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
+  gap: 8px;
   padding: 22px 16px;
   position: sticky;
   top: 0;
@@ -110,16 +190,17 @@ input, select {
 }
 .sidebar-title { display: flex; align-items: center; gap: 10px; }
 .sidebar-logo {
-  width: 34px;
+  width: 52px;
   height: 34px;
-  flex: 0 0 34px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
+  flex: 0 0 52px;
+  border-radius: 6px;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 4px 6px;
 }
+.sidebar-logo img { width: 100%; height: 100%; object-fit: contain; }
 .sidebar-title-main { color: #fff; font-weight: 700; font-size: 15px; }
 .sidebar-title-sub { color: var(--sidebar-text); font-size: 11px; margin-top: 2px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 28px; flex: 1; }
@@ -181,8 +262,10 @@ input, select {
   padding: 18px;
 }
 .summary-card.danger { border-color: var(--danger); background: var(--danger-bg); }
+.summary-card.eco { border-color: var(--success); background: var(--success-bg); }
 .summary-card-value { font-size: 26px; font-weight: 700; color: var(--text-h); }
 .summary-card.danger .summary-card-value { color: var(--danger); }
+.summary-card.eco .summary-card-value { color: var(--success); }
 .summary-card-label { font-size: 13px; color: var(--text); margin-top: 4px; }
 
 /* Panels */
@@ -224,6 +307,9 @@ th.sortable:hover { color: var(--text-h); }
 .recent-movements-header h3 { margin: 0; }
 .movement-filters { display: flex; gap: 8px; }
 .movement-filters select { font-size: 13px; padding: 6px 8px; }
+
+.table-more-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+.table-more-actions button { font-size: 13px; padding: 7px 14px; }
 
 /* Movement form */
 .movement-form { margin-bottom: 24px; }

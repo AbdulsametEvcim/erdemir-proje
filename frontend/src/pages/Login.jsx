@@ -26,22 +26,35 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Envanter/Stok Takip Sistemi</h1>
-        <p className="login-subtitle">Erdemir ERP ve Çevresel Uygulamalar Stajı</p>
+      <img className="login-bg-photo" src="/login-bg.jpg" alt="" />
+      <div className="login-bg-overlay" />
 
-        <label>Kullanıcı Adı</label>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
+      <div className="login-content">
+        <div className="login-brand">
+          <div className="login-illustration-logo">
+            <img src="/favicon.svg" alt="Erdemir" />
+          </div>
+          <h2>Envanter / Stok Takip ve Tahmin Sistemi</h2>
+          <p>Hammadde ve malzeme stoklarını gerçek zamanlı izleyin, kritik seviyeleri önceden görün.</p>
+        </div>
 
-        <label>Şifre</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <form className="login-card" onSubmit={handleSubmit}>
+          <h1>Giriş Yap</h1>
+          <p className="login-subtitle">Erdemir ERP ve Çevresel Uygulamalar Stajı</p>
 
-        {error && <div className="login-error">{error}</div>}
+          <label>Kullanıcı Adı</label>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
-        </button>
-      </form>
+          <label>Şifre</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+
+          {error && <div className="login-error">{error}</div>}
+
+          <button type="submit" disabled={loading}>
+            {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

@@ -14,6 +14,7 @@ class Material(Base):
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="ton")
     current_stock: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     critical_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    co2_factor: Mapped[float] = mapped_column(Float, nullable=False, default=0)  # kg CO2 / birim
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     movements: Mapped[list["StockMovement"]] = relationship(
@@ -29,6 +30,7 @@ class StockMovement(Base):
     movement_type: Mapped[str] = mapped_column(String(10), nullable=False)  # "giris" | "cikis"
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     note: Mapped[str] = mapped_column(String(255), nullable=True)
+    supplier: Mapped[str] = mapped_column(String(120), nullable=True)
     created_by: Mapped[str] = mapped_column(String(50), nullable=False, default="admin")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

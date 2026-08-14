@@ -17,6 +17,7 @@ class MaterialCreate(BaseModel):
     unit: str = "ton"
     current_stock: float = 0
     critical_threshold: float = 0
+    co2_factor: float = 0
 
 
 class MaterialUpdate(BaseModel):
@@ -24,6 +25,7 @@ class MaterialUpdate(BaseModel):
     unit: str | None = None
     current_stock: float | None = None
     critical_threshold: float | None = None
+    co2_factor: float | None = None
 
 
 class MaterialOut(BaseModel):
@@ -32,6 +34,7 @@ class MaterialOut(BaseModel):
     unit: str
     current_stock: float
     critical_threshold: float
+    co2_factor: float
     status: str
     trend: str
 
@@ -51,6 +54,7 @@ class MovementCreate(BaseModel):
     movement_type: str  # "giris" | "cikis"
     quantity: float
     note: str | None = None
+    supplier: str | None = None
 
 
 class MovementOut(BaseModel):
@@ -60,6 +64,7 @@ class MovementOut(BaseModel):
     movement_type: str
     quantity: float
     note: str | None
+    supplier: str | None
     created_by: str
     created_at: datetime
 
@@ -90,3 +95,32 @@ class AlertOut(BaseModel):
     current_stock: float
     critical_threshold: float
     unit: str
+
+
+class EnvironmentalItem(BaseModel):
+    material_id: int
+    material_name: str
+    unit: str
+    total_consumption: float
+    co2_factor: float
+    total_co2_kg: float
+
+
+class EnvironmentalSummary(BaseModel):
+    days: int
+    total_co2_kg: float
+    total_co2_ton: float
+    items: list[EnvironmentalItem]
+
+
+class SupplierMaterialBreakdown(BaseModel):
+    material_name: str
+    unit: str
+    total_quantity: float
+
+
+class SupplierSummaryItem(BaseModel):
+    supplier: str
+    deliveries: int
+    last_delivery: datetime
+    materials: list[SupplierMaterialBreakdown]

@@ -1,6 +1,7 @@
 import io
 import os
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -10,12 +11,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.database import Base, engine, get_db
+from app.database import Base, SessionLocal, engine, get_db
 from app.forecast import compute_daily_consumption, compute_trend, forecast_days_remaining
 from app.models import Material, StockMovement
+from app.report import build_material_report, build_summary_report
+from app.seed import top_up_movements
 from app.schemas import (
     AlertOut,
     ConsumptionComparisonItem,
+    EnvironmentalItem,
+    EnvironmentalSummary,
     LoginRequest,
     LoginResponse,
     MaterialAnalysis,
@@ -24,6 +29,8 @@ from app.schemas import (
     MaterialUpdate,
     MovementCreate,
     MovementOut,
+    SupplierMaterialBreakdown,
+    SupplierSummaryItem,
 )
 
 load_dotenv()
@@ -33,6 +40,9 @@ LOGIN_USERNAME = os.getenv("LOGIN_USERNAME")
 LOGIN_PASSWORD = os.getenv("LOGIN_PASSWORD")
 
 Base.metadata.create_all(bind=engine)
+
+with SessionLocal() as _startup_db:
+    top_up_movements(_startup_db)
 
 app = FastAPI(title="Envanter/Stok Takip ve Tahmin Sistemi")
 
@@ -80,11 +90,16 @@ def get_summary(db: Session = Depends(get_db), _: None = Depends(require_auth)):
 
     week_ago = datetime.utcnow() - timedelta(days=7)
     recent_out = db.execute(
-        select(StockMovement).where(
+        select(StockMovement)
+        .join(Material)
+        .where(
             StockMovement.movement_type == "cikis",
             StockMovement.created_at >= week_ago,
+            Material.unit == "ton",
         )
     ).scalars().all()
+    # Farkli birimler (m3, adet) toplamda karismasin diye sadece "ton" birimli
+    # malzemeler toplaniyor; bu, kartta gosterilen "ton" etiketiyle tutarli olur.
     total_consumption_7d = sum(m.quantity for m in recent_out)
 
     return {
@@ -121,6 +136,7 @@ def list_materials(
             unit=m.unit,
             current_stock=m.current_stock,
             critical_threshold=m.critical_threshold,
+            co2_factor=m.co2_factor,
             status=material_status(m),
             trend=get_material_trend(db, m.id),
         )
@@ -144,12 +160,15 @@ def create_material(
 
     if payload.current_stock < 0 or payload.critical_threshold < 0:
         raise HTTPException(status_code=400, detail="Miktarlar negatif olamaz")
+    if payload.co2_factor < 0:
+        raise HTTPException(status_code=400, detail="CO2 faktoru negatif olamaz")
 
     material = Material(
         name=name,
         unit=payload.unit,
         current_stock=payload.current_stock,
         critical_threshold=payload.critical_threshold,
+        co2_factor=payload.co2_factor,
     )
     db.add(material)
     db.commit()
@@ -161,6 +180,7 @@ def create_material(
         unit=material.unit,
         current_stock=material.current_stock,
         critical_threshold=material.critical_threshold,
+        co2_factor=material.co2_factor,
         status=material_status(material),
         trend="sabit",
     )
@@ -201,6 +221,11 @@ def update_material(
             raise HTTPException(status_code=400, detail="Kritik esik negatif olamaz")
         material.critical_threshold = payload.critical_threshold
 
+    if payload.co2_factor is not None:
+        if payload.co2_factor < 0:
+            raise HTTPException(status_code=400, detail="CO2 faktoru negatif olamaz")
+        material.co2_factor = payload.co2_factor
+
     db.commit()
     db.refresh(material)
 
@@ -210,6 +235,7 @@ def update_material(
         unit=material.unit,
         current_stock=material.current_stock,
         critical_threshold=material.critical_threshold,
+        co2_factor=material.co2_factor,
         status=material_status(material),
         trend=get_material_trend(db, material.id),
     )
@@ -280,6 +306,7 @@ def list_movements(
             movement_type=mv.movement_type,
             quantity=mv.quantity,
             note=mv.note,
+            supplier=mv.supplier,
             created_by=mv.created_by,
             created_at=mv.created_at,
         )
@@ -314,7 +341,8 @@ def create_movement(
         movement_type=payload.movement_type,
         quantity=payload.quantity,
         note=payload.note,
-        created_by="admin",
+        supplier=payload.supplier if payload.movement_type == "giris" else None,
+        created_by=LOGIN_USERNAME,
     )
     db.add(movement)
     db.commit()
@@ -327,9 +355,33 @@ def create_movement(
         movement_type=movement.movement_type,
         quantity=movement.quantity,
         note=movement.note,
+        supplier=movement.supplier,
         created_by=movement.created_by,
         created_at=movement.created_at,
     )
+
+
+def compute_material_analysis(db: Session, material: Material) -> dict:
+    movements = db.execute(
+        select(StockMovement).where(StockMovement.material_id == material.id)
+    ).scalars().all()
+
+    daily_totals = compute_daily_consumption(movements, days=90)
+    avg_daily, days_remaining, message = forecast_days_remaining(daily_totals, material.current_stock)
+
+    return {
+        "material_id": material.id,
+        "material_name": material.name,
+        "unit": material.unit,
+        "current_stock": material.current_stock,
+        "critical_threshold": material.critical_threshold,
+        "daily_consumption": [
+            {"date": d, "quantity": round(q, 2)} for d, q in sorted(daily_totals.items())
+        ],
+        "avg_daily_consumption": round(avg_daily, 2),
+        "days_remaining": days_remaining,
+        "forecast_message": message,
+    }
 
 
 @app.get("/api/materials/{material_id}/analysis", response_model=MaterialAnalysis)
@@ -342,25 +394,34 @@ def get_material_analysis(
     if not material:
         raise HTTPException(status_code=404, detail="Malzeme bulunamadi")
 
-    movements = db.execute(
-        select(StockMovement).where(StockMovement.material_id == material_id)
-    ).scalars().all()
+    return MaterialAnalysis(**compute_material_analysis(db, material))
 
-    daily_totals = compute_daily_consumption(movements, days=90)
-    avg_daily, days_remaining, message = forecast_days_remaining(daily_totals, material.current_stock)
 
-    return MaterialAnalysis(
-        material_id=material.id,
-        material_name=material.name,
-        unit=material.unit,
-        current_stock=material.current_stock,
-        critical_threshold=material.critical_threshold,
-        daily_consumption=[
-            {"date": d, "quantity": round(q, 2)} for d, q in sorted(daily_totals.items())
-        ],
-        avg_daily_consumption=round(avg_daily, 2),
-        days_remaining=days_remaining,
-        forecast_message=message,
+@app.get("/api/materials/{material_id}/report")
+def download_material_report(
+    material_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_auth),
+):
+    material = db.get(Material, material_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="Malzeme bulunamadi")
+
+    analysis = compute_material_analysis(db, material)
+    pdf_buffer = build_material_report(analysis)
+
+    raw_filename = f"{material.name.replace(' ', '_')}_rapor.pdf"
+    ascii_fallback = raw_filename.encode("ascii", "ignore").decode("ascii") or "rapor.pdf"
+    encoded_filename = quote(raw_filename)
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{encoded_filename}"
+            )
+        },
     )
 
 
@@ -371,7 +432,11 @@ def consumption_comparison(
     _: None = Depends(require_auth),
 ):
     since = datetime.utcnow() - timedelta(days=days)
-    materials = db.execute(select(Material).order_by(Material.name)).scalars().all()
+    # Farkli birimler (m3, adet) ayni cubuk grafikte anlamsiz bir karsilastirma
+    # yaratir; ozet karttaki gibi burada da sadece ton bazli malzemeler kiyaslanir.
+    materials = db.execute(
+        select(Material).where(Material.unit == "ton").order_by(Material.name)
+    ).scalars().all()
 
     result = []
     for m in materials:
@@ -393,6 +458,86 @@ def consumption_comparison(
     return result
 
 
+@app.get("/api/environmental/summary", response_model=EnvironmentalSummary)
+def environmental_summary(
+    days: int = Query(default=30, le=90),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_auth),
+):
+    since = datetime.utcnow() - timedelta(days=days)
+    materials = db.execute(select(Material).order_by(Material.name)).scalars().all()
+
+    items = []
+    total_co2_kg = 0.0
+    for m in materials:
+        total_consumption = db.execute(
+            select(func.coalesce(func.sum(StockMovement.quantity), 0.0)).where(
+                StockMovement.material_id == m.id,
+                StockMovement.movement_type == "cikis",
+                StockMovement.created_at >= since,
+            )
+        ).scalar_one()
+        material_co2_kg = round(float(total_consumption) * m.co2_factor, 2)
+        total_co2_kg += material_co2_kg
+        items.append(
+            EnvironmentalItem(
+                material_id=m.id,
+                material_name=m.name,
+                unit=m.unit,
+                total_consumption=round(float(total_consumption), 2),
+                co2_factor=m.co2_factor,
+                total_co2_kg=material_co2_kg,
+            )
+        )
+
+    return EnvironmentalSummary(
+        days=days,
+        total_co2_kg=round(total_co2_kg, 2),
+        total_co2_ton=round(total_co2_kg / 1000, 2),
+        items=items,
+    )
+
+
+@app.get("/api/suppliers/summary", response_model=list[SupplierSummaryItem])
+def suppliers_summary(db: Session = Depends(get_db), _: None = Depends(require_auth)):
+    movements = db.execute(
+        select(StockMovement).where(
+            StockMovement.movement_type == "giris",
+            StockMovement.supplier.isnot(None),
+            StockMovement.supplier != "",
+        )
+    ).scalars().all()
+
+    grouped: dict[str, dict] = {}
+    for mv in movements:
+        entry = grouped.setdefault(
+            mv.supplier, {"deliveries": 0, "last_delivery": mv.created_at, "materials": {}}
+        )
+        entry["deliveries"] += 1
+        entry["last_delivery"] = max(entry["last_delivery"], mv.created_at)
+        mat_entry = entry["materials"].setdefault(
+            mv.material.name, {"unit": mv.material.unit, "total_quantity": 0.0}
+        )
+        mat_entry["total_quantity"] += mv.quantity
+
+    result = []
+    for supplier, data in sorted(grouped.items()):
+        result.append(
+            SupplierSummaryItem(
+                supplier=supplier,
+                deliveries=data["deliveries"],
+                last_delivery=data["last_delivery"],
+                materials=[
+                    SupplierMaterialBreakdown(
+                        material_name=name, unit=info["unit"], total_quantity=round(info["total_quantity"], 2)
+                    )
+                    for name, info in sorted(data["materials"].items())
+                ],
+            )
+        )
+    return result
+
+
 @app.get("/api/alerts", response_model=list[AlertOut])
 def get_alerts(db: Session = Depends(get_db), _: None = Depends(require_auth)):
     materials = db.execute(select(Material)).scalars().all()
@@ -407,3 +552,57 @@ def get_alerts(db: Session = Depends(get_db), _: None = Depends(require_auth)):
         )
         for m in critical
     ]
+
+
+@app.get("/api/reports/summary-pdf")
+def download_summary_report(db: Session = Depends(get_db), _: None = Depends(require_auth)):
+    materials = db.execute(select(Material).order_by(Material.name)).scalars().all()
+
+    critical_count = sum(1 for m in materials if material_status(m) == "kritik")
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    recent_out = db.execute(
+        select(StockMovement)
+        .join(Material)
+        .where(
+            StockMovement.movement_type == "cikis",
+            StockMovement.created_at >= week_ago,
+            Material.unit == "ton",
+        )
+    ).scalars().all()
+    summary = {
+        "total_materials": len(materials),
+        "critical_materials": critical_count,
+        "total_consumption_7d": round(sum(m.quantity for m in recent_out), 2),
+    }
+
+    material_rows = [
+        {
+            "name": m.name,
+            "unit": m.unit,
+            "current_stock": m.current_stock,
+            "critical_threshold": m.critical_threshold,
+            "status": material_status(m),
+        }
+        for m in materials
+    ]
+    alert_rows = [{"name": m.name} for m in materials if material_status(m) == "kritik"]
+
+    since_30d = datetime.utcnow() - timedelta(days=30)
+    comparison_rows = []
+    for m in [m for m in materials if m.unit == "ton"]:
+        total = db.execute(
+            select(func.coalesce(func.sum(StockMovement.quantity), 0.0)).where(
+                StockMovement.material_id == m.id,
+                StockMovement.movement_type == "cikis",
+                StockMovement.created_at >= since_30d,
+            )
+        ).scalar_one()
+        comparison_rows.append({"material_name": m.name, "total_consumption": round(float(total), 2)})
+
+    pdf_buffer = build_summary_report(summary, material_rows, alert_rows, comparison_rows)
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=envanter_genel_rapor.pdf"},
+    )

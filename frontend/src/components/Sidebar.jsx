@@ -1,9 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BoxIcon, HomeIcon, LogoutIcon, SwapIcon } from './icons'
+import { HomeIcon, LeafIcon, LogoutIcon, SwapIcon } from './icons'
+import ThemeToggle from './ThemeToggle'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Ana Sayfa', end: true, icon: HomeIcon },
   { to: '/hareketler', label: 'Stok Hareketleri', icon: SwapIcon },
+  { to: '/cevresel-etki', label: 'Çevresel Etki', icon: LeafIcon },
 ]
 
 export default function Sidebar() {
@@ -17,7 +19,9 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-title">
-        <div className="sidebar-logo"><BoxIcon width={20} height={20} /></div>
+        <div className="sidebar-logo">
+          <img src="/favicon.svg" alt="Erdemir" />
+        </div>
         <div>
           <div className="sidebar-title-main">Envanter Sistemi</div>
           <div className="sidebar-title-sub">Erdemir ERP Staj Projesi</div>
@@ -41,6 +45,7 @@ export default function Sidebar() {
         })}
       </nav>
 
+      <ThemeToggle />
       <button className="sidebar-logout" onClick={handleLogout}>
         <LogoutIcon />
         Çıkış Yap

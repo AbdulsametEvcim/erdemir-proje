@@ -7,6 +7,7 @@ export default function MovementForm({ materials, onSaved }) {
   const [movementType, setMovementType] = useState('cikis')
   const [quantity, setQuantity] = useState('')
   const [note, setNote] = useState('')
+  const [supplier, setSupplier] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const showToast = useToast()
@@ -26,11 +27,13 @@ export default function MovementForm({ materials, onSaved }) {
         movement_type: movementType,
         quantity: Number(quantity),
         note: note || null,
+        supplier: movementType === 'giris' ? (supplier || null) : null,
       })
       const typeLabel = movementType === 'giris' ? 'girişi' : 'çıkışı'
       showToast(`${material?.name ?? 'Malzeme'} için ${quantity} birim ${typeLabel} kaydedildi`, 'success')
       setQuantity('')
       setNote('')
+      setSupplier('')
       onSaved()
     } catch (err) {
       const message = err.response?.data?.detail || 'Hareket kaydedilemedi'
@@ -64,6 +67,15 @@ export default function MovementForm({ materials, onSaved }) {
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
         />
+
+        {movementType === 'giris' && (
+          <input
+            type="text"
+            placeholder="Tedarikçi"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+          />
+        )}
 
         <input
           type="text"

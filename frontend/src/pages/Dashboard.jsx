@@ -54,6 +54,18 @@ export default function Dashboard() {
     window.URL.revokeObjectURL(url)
   }
 
+  async function handleSummaryReport() {
+    const res = await api.get('/reports/summary-pdf', { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'envanter_genel_rapor.pdf')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -82,6 +94,7 @@ export default function Dashboard() {
             <button className="secondary-btn" onClick={() => setShowAddMaterial((v) => !v)}>
               + Yeni Malzeme
             </button>
+            <button className="secondary-btn" onClick={handleSummaryReport}>Genel Rapor İndir</button>
             <button onClick={handleExport}>Excel'e Aktar</button>
           </div>
         </div>

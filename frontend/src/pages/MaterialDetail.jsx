@@ -28,6 +28,22 @@ export default function MaterialDetail() {
     loadAnalysis()
   }, [id])
 
+  async function handlePdfDownload() {
+    try {
+      const res = await api.get(`/materials/${id}/report`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${analysis.material_name}_rapor.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      showToast('Rapor oluşturulamadı', 'error')
+    }
+  }
+
   async function handleDelete() {
     setDeleting(true)
     try {
@@ -69,6 +85,7 @@ export default function MaterialDetail() {
           {isCritical ? 'Kritik' : 'Normal'}
         </span>
         <div className="detail-header-actions">
+          <button className="secondary-btn" onClick={handlePdfDownload}>PDF Raporu İndir</button>
           <button className="secondary-btn" onClick={() => setEditing((v) => !v)}>Düzenle</button>
           <button className="danger-btn" onClick={() => setConfirmingDelete(true)} disabled={deleting}>
             {deleting ? 'Siliniyor...' : 'Sil'}

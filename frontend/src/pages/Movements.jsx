@@ -4,17 +4,19 @@ import Layout from '../components/Layout'
 import MovementForm from '../components/MovementForm'
 import RecentMovements from '../components/RecentMovements'
 import MovementFilters from '../components/MovementFilters'
+import SupplierSummary from '../components/SupplierSummary'
 import { Spinner } from '../components/Loading'
 
 export default function Movements() {
   const [allMaterials, setAllMaterials] = useState([])
   const [movements, setMovements] = useState([])
+  const [suppliers, setSuppliers] = useState([])
   const [movementMaterialId, setMovementMaterialId] = useState('')
   const [movementType, setMovementType] = useState('')
   const [loading, setLoading] = useState(true)
 
   const loadAll = useCallback(async () => {
-    const [materialsRes, movementsRes] = await Promise.all([
+    const [materialsRes, movementsRes, suppliersRes] = await Promise.all([
       api.get('/materials'),
       api.get('/movements', {
         params: {
@@ -23,9 +25,11 @@ export default function Movements() {
           movement_type: movementType || undefined,
         },
       }),
+      api.get('/suppliers/summary'),
     ])
     setAllMaterials(materialsRes.data)
     setMovements(movementsRes.data)
+    setSuppliers(suppliersRes.data)
     setLoading(false)
   }, [movementMaterialId, movementType])
 
@@ -62,6 +66,8 @@ export default function Movements() {
         </div>
         <RecentMovements movements={movements} />
       </section>
+
+      <SupplierSummary suppliers={suppliers} />
     </Layout>
   )
 }
